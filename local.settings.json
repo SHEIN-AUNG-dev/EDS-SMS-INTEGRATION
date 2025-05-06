@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "APPINSIGHTS_INSTRUMENTATIONKEY": "",
+    "EDS_API_BASE_URL": "http://edsapi.lodestoneenergy.co.nz:43084/api/v1/",
+    "EDS_API_USERNAME": "s.aung",
+    "EDS_API_PASSWORD": "7GnuAsh$61",
+    "EDS_API_CLIENT_TYPE": "web_interface",
+    "TNZ_API_BASE_URL": "https://api.tnz.co.nz/api/v1",
+    "TNZ_API_KEY": "your_api_key",
+    "ALARM_NOTIFICATION_THRESHOLD": "2",
+    "LAST_RUN_MINUTES": "15",
+    "CONTACT_LIST": "[{\"name\": \"Shein Aung\", \"number\": \"+640225699797\"}]"
+  }
+}

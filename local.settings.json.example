@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "APPINSIGHTS_INSTRUMENTATIONKEY": "",
+    "EDS_API_BASE_URL": "http://edsapi.example.com/api/v1/",
+    "EDS_API_USERNAME": "your_username",
+    "EDS_API_PASSWORD": "your_password",
+    "EDS_API_CLIENT_TYPE": "azure_function",
+    "TNZ_API_BASE_URL": "https://api.tnz.co.nz/api/v1",
+    "TNZ_API_KEY": "your_api_key",
+    "ALARM_NOTIFICATION_THRESHOLD": "2",
+    "LAST_RUN_MINUTES": "15",
+    "CONTACT_LIST": "[{\"name\":\"Example Contact\",\"number\":\"+64210000000\"}]"
+  }
+}

@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuration - EDS Alarm Manager{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add contact button
+        document.getElementById('add-contact-btn').addEventListener('click', function() {
+            const contactList = document.getElementById('contact-list');
+            const newContact = document.createElement('div');
+            newContact.className = 'input-group mb-2 contact-entry';
+            newContact.innerHTML = `
+                <input type="text" class="form-control contact-name" placeholder="Name" name="contact_name[]">
+                <input type="tel" class="form-control contact-number" placeholder="Phone Number (e.g., +6421234567)" name="contact_number[]">
+                <button type="button" class="btn btn-danger remove-contact-btn"><i class="bi bi-trash"></i> Remove</button>
+            `;
+            contactList.appendChild(newContact);
+            
+            // Add event listener to the new remove button
+            newContact.querySelector('.remove-contact-btn').addEventListener('click', function() {
+                contactList.removeChild(newContact);
+            });
+        });
+        
+        // Remove contact buttons (for initial elements)
+        document.querySelectorAll('.remove-contact-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const contactEntry = this.closest('.contact-entry');
+                contactEntry.parentNode.removeChild(contactEntry);
+            });
+        });
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1>Configuration</h1>
+        <p class="lead">Configure connection settings for EDS and TNZ APIs.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">API Settings</h5>
+            </div>
+            <div class="card-body">
+                <form action="/config/save" method="post">
+                    <div class="mb-3">
+                        <h5>EDS API Settings</h5>
+                        <hr>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="eds_api_base_url" class="form-label">EDS API Base URL</label>
+                        <input type="url" class="form-control" id="eds_api_base_url" name="eds_api_base_url" 
+                               value="{{ configs.EDS_API_BASE_URL }}" required>
+                        <div class="form-text">The base URL of the EDS API server (e.g., https://eds-demo.tt.com.pl/webapi)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="eds_api_username" class="form-label">EDS API Username</label>
+                        <input type="text" class="form-control" id="eds_api_username" name="eds_api_username" 
+                               value="{{ configs.EDS_API_USERNAME }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="eds_api_password" class="form-label">EDS API Password</label>
+                        <input type="password" class="form-control" id="eds_api_password" name="eds_api_password" 
+                               value="{{ eds_password_masked if eds_password_masked else '' }}" 
+                               placeholder="{% if eds_password_masked %}Password saved{% else %}Enter password{% endif %}">
+                        <div class="form-text">Leave blank to keep existing password</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="eds_api_client_type" class="form-label">EDS API Client Type</label>
+                        <input type="text" class="form-control" id="eds_api_client_type" name="eds_api_client_type" 
+                               value="{{ configs.EDS_API_CLIENT_TYPE }}">
+                        <div class="form-text">Client type identifier for the EDS API</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>TNZ API Settings</h5>
+                        <hr>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="tnz_api_base_url" class="form-label">TNZ API Base URL</label>
+                        <input type="url" class="form-control" id="tnz_api_base_url" name="tnz_api_base_url" 
+                               value="{{ configs.TNZ_API_BASE_URL }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="tnz_api_key" class="form-label">TNZ API Key</label>
+                        <input type="password" class="form-control" id="tnz_api_key" name="tnz_api_key" 
+                               value="{{ tnz_api_key_masked if tnz_api_key_masked else '' }}" 
+                               placeholder="{% if tnz_api_key_masked %}API key saved{% else %}Enter API key{% endif %}">
+                        <div class="form-text">Leave blank to keep existing API key</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>Alarm Processing Settings</h5>
+                        <hr>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="alarm_notification_threshold" class="form-label">Alarm Notification Threshold</label>
+                        <select class="form-select" id="alarm_notification_threshold" name="alarm_notification_threshold">
+                            <option value="1" {% if configs.ALARM_NOTIFICATION_THRESHOLD == "1" %}selected{% endif %}>1 - High Priority Only</option>
+                            <option value="2" {% if configs.ALARM_NOTIFICATION_THRESHOLD == "2" %}selected{% endif %}>2 - High and Medium Priority</option>
+                            <option value="3" {% if configs.ALARM_NOTIFICATION_THRESHOLD == "3" %}selected{% endif %}>3 - All Priorities</option>
+                        </select>
+                        <div class="form-text">Priority threshold for sending notifications (1 = highest priority)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="last_run_minutes" class="form-label">Time Window (minutes)</label>
+                        <input type="number" class="form-control" id="last_run_minutes" name="last_run_minutes" 
+                               value="{{ configs.LAST_RUN_MINUTES }}" min="1" max="1440" required>
+                        <div class="form-text">Time window in minutes to look for new alarms</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h5>Contact Management</h5>
+                        <hr>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Contact Numbers for SMS Notifications</label>
+                        <div id="contact-list" class="mb-3">
+                            {% if contacts %}
+                                {% for contact in contacts %}
+                                <div class="input-group mb-2 contact-entry">
+                                    <input type="text" class="form-control contact-name" placeholder="Name" value="{{ contact.name }}" name="contact_name[]">
+                                    <input type="tel" class="form-control contact-number" placeholder="Phone Number (e.g., +6421234567)" value="{{ contact.number }}" name="contact_number[]">
+                                    <button type="button" class="btn btn-danger remove-contact-btn"><i class="bi bi-trash"></i> Remove</button>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="input-group mb-2 contact-entry">
+                                    <input type="text" class="form-control contact-name" placeholder="Name" name="contact_name[]">
+                                    <input type="tel" class="form-control contact-number" placeholder="Phone Number (e.g., +6421234567)" name="contact_number[]">
+                                    <button type="button" class="btn btn-danger remove-contact-btn"><i class="bi bi-trash"></i> Remove</button>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <button type="button" id="add-contact-btn" class="btn btn-primary btn-sm">
+                            <i class="bi bi-plus-circle"></i> Add Contact
+                        </button>
+                    </div>
+                    
+                    <div class="mt-4 d-flex justify-content-end">
+                        <button type="reset" class="btn btn-secondary me-2">Reset</button>
+                        <button type="submit" class="btn btn-primary">Save Configuration</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,411 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - EDS Alarm Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Alarm Dashboard</h1>
+            <div>
+                <button id="refresh-alarms" class="btn btn-primary me-2">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button id="check-alarms" class="btn btn-success">
+                    <i class="bi bi-bell"></i> Check Alarms
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6 mb-3">
+        <div class="card card-status">
+            <div class="card-header">
+                <h5 class="card-title mb-0">EDS API Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="eds-status" data-base-url="{{ eds_api_base_url }}">
+                    <div class="d-flex justify-content-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-3">
+        <div class="card card-status">
+            <div class="card-header">
+                <h5 class="card-title mb-0">TNZ API Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="tnz-status" data-base-url="{{ tnz_api_base_url }}">
+                    <div class="d-flex justify-content-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Recent Alarms</h5>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        Time Range
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item time-range" data-minutes="15" href="#">Last 15 minutes</a></li>
+                        <li><a class="dropdown-item time-range" data-minutes="60" href="#">Last hour</a></li>
+                        <li><a class="dropdown-item time-range" data-minutes="360" href="#">Last 6 hours</a></li>
+                        <li><a class="dropdown-item time-range" data-minutes="1440" href="#">Last 24 hours</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="alarms-table-container">
+                    <div class="d-flex justify-content-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for alarm check results -->
+<div class="modal fade" id="alarmCheckModal" tabindex="-1" aria-labelledby="alarmCheckModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="alarmCheckModalLabel">Alarm Check Results</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="alarm-check-results">
+                <p>Checking alarms...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="send-notifications">Send SMS Notifications</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // API status display
+    function displayApiStatus() {
+        // Display base URLs without making API calls first
+        document.getElementById('eds-status').innerHTML = `
+            <div class="d-flex align-items-center mb-2">
+                <span class="api-status api-status-disconnected"></span>
+                <span class="fw-bold">NOT CHECKED</span>
+            </div>
+            <p class="mb-1"><strong>Base URL:</strong> ${document.getElementById('eds-status').getAttribute('data-base-url') || 'Not configured'}</p>
+            <button class="btn btn-sm btn-primary mt-2 check-connection-btn">Check Connection</button>
+        `;
+        
+        document.getElementById('tnz-status').innerHTML = `
+            <div class="d-flex align-items-center mb-2">
+                <span class="api-status api-status-disconnected"></span>
+                <span class="fw-bold">NOT CHECKED</span>
+            </div>
+            <p class="mb-1"><strong>Base URL:</strong> ${document.getElementById('tnz-status').getAttribute('data-base-url') || 'Not configured'}</p>
+            <button class="btn btn-sm btn-primary mt-2 check-connection-btn">Check Connection</button>
+        `;
+        
+        // Add event listeners to the connection check buttons
+        document.querySelectorAll('.check-connection-btn').forEach(btn => {
+            btn.addEventListener('click', checkApiStatus);
+        });
+    }
+    
+    // API status check - Only run when requested
+    function checkApiStatus() {
+        // Update status displays to show loading
+        document.getElementById('eds-status').innerHTML = `
+            <div class="d-flex justify-content-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="ms-2">Checking connection...</p>
+            </div>
+        `;
+        
+        document.getElementById('tnz-status').innerHTML = `
+            <div class="d-flex justify-content-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="ms-2">Checking connection...</p>
+            </div>
+        `;
+        
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                // Update EDS status
+                const edsStatus = data.eds_api.status === 'connected' ? 
+                    'connected' : 'disconnected';
+                document.getElementById('eds-status').innerHTML = `
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="api-status api-status-${edsStatus}"></span>
+                        <span class="fw-bold">${edsStatus.toUpperCase()}</span>
+                    </div>
+                    <p class="mb-1"><strong>Base URL:</strong> ${data.eds_api.base_url}</p>
+                    <button class="btn btn-sm btn-primary mt-2 check-connection-btn">Check Again</button>
+                `;
+                
+                // Update TNZ status
+                const tnzStatus = data.tnz_api.status === 'connected' ? 
+                    'connected' : 'disconnected';
+                document.getElementById('tnz-status').innerHTML = `
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="api-status api-status-${tnzStatus}"></span>
+                        <span class="fw-bold">${tnzStatus.toUpperCase()}</span>
+                    </div>
+                    <p class="mb-1"><strong>Base URL:</strong> ${data.tnz_api.base_url}</p>
+                    <button class="btn btn-sm btn-primary mt-2 check-connection-btn">Check Again</button>
+                `;
+                
+                // Re-add event listeners
+                document.querySelectorAll('.check-connection-btn').forEach(btn => {
+                    btn.addEventListener('click', checkApiStatus);
+                });
+            })
+            .catch(error => {
+                console.error('Error checking API status:', error);
+                document.getElementById('eds-status').innerHTML = `
+                    <div class="alert alert-danger">Error checking status</div>
+                    <button class="btn btn-sm btn-primary mt-2 check-connection-btn">Try Again</button>
+                `;
+                document.getElementById('tnz-status').innerHTML = `
+                    <div class="alert alert-danger">Error checking status</div>
+                    <button class="btn btn-sm btn-primary mt-2 check-connection-btn">Try Again</button>
+                `;
+                
+                // Re-add event listeners
+                document.querySelectorAll('.check-connection-btn').forEach(btn => {
+                    btn.addEventListener('click', checkApiStatus);
+                });
+            });
+    }
+    
+    // Display alarms placeholder
+    function displayAlarmsPlaceholder() {
+        document.getElementById('alarms-table-container').innerHTML = `
+            <div class="alert alert-info">
+                <p>Click the "Refresh" button above to load alarm data.</p>
+            </div>
+        `;
+    }
+    
+    // Get alarms - Only run when requested
+    function getAlarms(minutes = 60) {
+        document.getElementById('alarms-table-container').innerHTML = `
+            <div class="d-flex justify-content-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="ms-2">Loading alarms...</p>
+            </div>
+        `;
+        
+        fetch(`/api/alarms?minutes=${minutes}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('alarms-table-container').innerHTML = `
+                        <div class="alert alert-danger">${data.error}</div>
+                    `;
+                    return;
+                }
+                
+                const alarms = data.alarms || [];
+                
+                if (alarms.length === 0) {
+                    document.getElementById('alarms-table-container').innerHTML = `
+                        <div class="alert alert-info">No alarms found in the selected time range.</div>
+                    `;
+                    return;
+                }
+                
+                // Create table
+                let tableHtml = `
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Priority</th>
+                                    <th>Time</th>
+                                    <th>Point Name</th>
+                                    <th>Description</th>
+                                    <th>Value</th>
+                                    <th>Source</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                alarms.forEach(alarm => {
+                    let priorityClass = '';
+                    if (alarm.priority === 'HIGH') priorityClass = 'alarm-priority-1';
+                    else if (alarm.priority === 'MEDIUM') priorityClass = 'alarm-priority-2';
+                    else if (alarm.priority === 'LOW') priorityClass = 'alarm-priority-3';
+                    
+                    tableHtml += `
+                        <tr class="${priorityClass}">
+                            <td>${alarm.priority}</td>
+                            <td>${alarm.timestamp}</td>
+                            <td>${alarm.name}</td>
+                            <td>${alarm.description}</td>
+                            <td>${alarm.value}</td>
+                            <td>${alarm.source}</td>
+                        </tr>
+                    `;
+                });
+                
+                tableHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                document.getElementById('alarms-table-container').innerHTML = tableHtml;
+            })
+            .catch(error => {
+                console.error('Error fetching alarms:', error);
+                document.getElementById('alarms-table-container').innerHTML = `
+                    <div class="alert alert-danger">Error fetching alarms.</div>
+                `;
+            });
+    }
+    
+    // Check alarms
+    function checkAlarms(sendSms = false) {
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('alarmCheckModal'));
+        modal.show();
+        
+        document.getElementById('alarm-check-results').innerHTML = `
+            <div class="d-flex justify-content-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="ms-2">Checking alarms...</p>
+            </div>
+        `;
+        
+        fetch('/api/check-alarms', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                send_sms: sendSms
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                document.getElementById('alarm-check-results').innerHTML = `
+                    <div class="alert alert-danger">${data.error}</div>
+                `;
+                return;
+            }
+            
+            let resultHtml = '';
+            
+            if (data.success) {
+                resultHtml = `
+                    <div class="alert alert-success">Alarm check completed successfully!</div>
+                    <ul class="list-group">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Alarms Processed
+                            <span class="badge bg-primary rounded-pill">${data.alarms_processed}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Notifications Generated
+                            <span class="badge bg-primary rounded-pill">${data.notifications_generated}</span>
+                        </li>
+                `;
+                
+                if (sendSms) {
+                    resultHtml += `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            SMS Messages Sent
+                            <span class="badge bg-success rounded-pill">${data.sms_sent}</span>
+                        </li>
+                    `;
+                }
+                
+                resultHtml += `</ul>`;
+                
+                // Hide the send notifications button if already sent
+                if (sendSms) {
+                    document.getElementById('send-notifications').style.display = 'none';
+                }
+            } else {
+                resultHtml = `
+                    <div class="alert alert-warning">Alarm check completed with warnings.</div>
+                    <p>${data.message || 'Unknown issue occurred'}</p>
+                `;
+            }
+            
+            document.getElementById('alarm-check-results').innerHTML = resultHtml;
+        })
+        .catch(error => {
+            console.error('Error checking alarms:', error);
+            document.getElementById('alarm-check-results').innerHTML = `
+                <div class="alert alert-danger">Error checking alarms.</div>
+            `;
+        });
+    }
+    
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize API status display
+        displayApiStatus();
+        
+        // Initialize alarms placeholder
+        displayAlarmsPlaceholder();
+        
+        // Refresh button - only runs API calls when clicked
+        document.getElementById('refresh-alarms').addEventListener('click', function() {
+            getAlarms();
+        });
+        
+        // Check alarms button
+        document.getElementById('check-alarms').addEventListener('click', function() {
+            checkAlarms(false);
+        });
+        
+        // Send notifications button
+        document.getElementById('send-notifications').addEventListener('click', function() {
+            checkAlarms(true);
+        });
+        
+        // Time range dropdown
+        document.querySelectorAll('.time-range').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const minutes = this.getAttribute('data-minutes');
+                getAlarms(minutes);
+            });
+        });
+    });
+</script>
+{% endblock %}
